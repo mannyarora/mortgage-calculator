@@ -23,7 +23,7 @@
             border-radius: 15px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             padding: 30px;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -74,9 +74,10 @@
         }
 
         th, td {
-            padding: 12px;
+            padding: 8px;
             text-align: right;
             border-bottom: 1px solid #dee2e6;
+            font-size: 0.9rem;
         }
 
         th:first-child, td:first-child {
@@ -117,6 +118,39 @@
             background: #c82333;
         }
 
+        .export-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .export-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .export-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .export-button.excel {
+            background: linear-gradient(135deg, #217346 0%, #28a745 100%);
+        }
+
+        .export-button.pdf {
+            background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -148,6 +182,11 @@
             <!-- Summary will be populated by JavaScript -->
         </div>
         
+        <div class="export-controls">
+            <button class="export-button excel" onclick="exportToExcel()">📊 Export to Excel</button>
+            <button class="export-button pdf" onclick="exportToPDF()">📄 Export to PDF</button>
+        </div>
+        
         <div class="table-container">
             <table>
                 <thead>
@@ -157,6 +196,9 @@
                         <th>Principal</th>
                         <th>Interest</th>
                         <th>Total Payment</th>
+                        <th>Cumulative Principal</th>
+                        <th>Cumulative Interest</th>
+                        <th>Total Paid</th>
                         <th>Remaining Balance</th>
                     </tr>
                 </thead>
@@ -167,6 +209,9 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script>
         function getUrlParams() {
             const params = new URLSearchParams(window.location.search);
@@ -246,19 +291,40 @@
 
             // Generate amortization table
             let balance = loanAmount;
+            let cumulativePrincipal = 0;
+            let cumulativeInterest = 0;
             let tableRows = '';
             const startDate = new Date();
+            amortizationData = [];
             
             for (let i = 1; i <= totalPayments; i++) {
                 const interestPayment = balance * monthlyRate;
                 const principalPayment = monthlyPayment - interestPayment;
                 balance -= principalPayment;
                 
+                // Update cumulative totals
+                cumulativePrincipal += principalPayment;
+                cumulativeInterest += interestPayment;
+                const totalPaid = cumulativePrincipal + cumulativeInterest;
+                
                 // Handle floating point precision issues
                 if (balance < 0.01) balance = 0;
                 
                 const paymentDate = new Date(startDate);
                 paymentDate.setMonth(startDate.getMonth() + i);
+                
+                // Store data for export
+                amortizationData.push([
+                    i,
+                    formatDate(paymentDate),
+                    principalPayment,
+                    interestPayment,
+                    monthlyPayment,
+                    cumulativePrincipal,
+                    cumulativeInterest,
+                    totalPaid,
+                    balance
+                ]);
                 
                 tableRows += `
                     <tr>
@@ -267,12 +333,152 @@
                         <td>${formatCurrency(principalPayment)}</td>
                         <td>${formatCurrency(interestPayment)}</td>
                         <td>${formatCurrency(monthlyPayment)}</td>
+                        <td>${formatCurrency(cumulativePrincipal)}</td>
+                        <td>${formatCurrency(cumulativeInterest)}</td>
+                        <td>${formatCurrency(totalPaid)}</td>
                         <td>${formatCurrency(balance)}</td>
                     </tr>
                 `;
             }
             
             document.getElementById('amortization-table').innerHTML = tableRows;
+        }
+
+        let amortizationData = [];
+
+        function exportToExcel() {
+            if (amortizationData.length === 0) {
+                alert('Please generate the amortization schedule first.');
+                return;
+            }
+
+            const params = getUrlParams();
+            const loanAmount = params.homePrice - (params.downPayment / 100 * params.homePrice);
+            const monthlyRate = params.interestRate / 100 / 12;
+            const totalPayments = params.loanTerm * 12;
+            
+            let monthlyPayment;
+            if (monthlyRate === 0) {
+                monthlyPayment = loanAmount / totalPayments;
+            } else {
+                monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+                                (Math.pow(1 + monthlyRate, totalPayments) - 1);
+            }
+
+            const totalInterest = (monthlyPayment * totalPayments) - loanAmount;
+            const totalCost = loanAmount + totalInterest;
+
+            const summaryData = [
+                ['Loan Summary', ''],
+                ['Home Price', params.homePrice],
+                ['Down Payment %', params.downPayment + '%'],
+                ['Loan Amount', loanAmount],
+                ['Interest Rate', params.interestRate + '%'],
+                ['Loan Term (Years)', params.loanTerm],
+                ['Monthly P&I Payment', monthlyPayment],
+                ['Total Interest', totalInterest],
+                ['Total Cost', totalCost],
+                ['', ''],
+                ['Payment Schedule', '']
+            ];
+
+            const headers = ['Payment #', 'Payment Date', 'Principal', 'Interest', 'Total Payment', 'Cumulative Principal', 'Cumulative Interest', 'Total Paid', 'Remaining Balance'];
+            
+            const allData = [...summaryData, headers, ...amortizationData];
+
+            const ws = XLSX.utils.aoa_to_sheet(allData);
+            
+            ws['!cols'] = [
+                { width: 12 },
+                { width: 15 },
+                { width: 12 },
+                { width: 12 },
+                { width: 15 },
+                { width: 18 },
+                { width: 18 },
+                { width: 12 },
+                { width: 18 }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Amortization Schedule');
+            
+            const filename = `Amortization_Schedule_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(wb, filename);
+        }
+
+        function exportToPDF() {
+            if (amortizationData.length === 0) {
+                alert('Please generate the amortization schedule first.');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            
+            const params = getUrlParams();
+            const loanAmount = params.homePrice - (params.downPayment / 100 * params.homePrice);
+            const monthlyRate = params.interestRate / 100 / 12;
+            const totalPayments = params.loanTerm * 12;
+            
+            let monthlyPayment;
+            if (monthlyRate === 0) {
+                monthlyPayment = loanAmount / totalPayments;
+            } else {
+                monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+                                (Math.pow(1 + monthlyRate, totalPayments) - 1);
+            }
+
+            const totalInterest = (monthlyPayment * totalPayments) - loanAmount;
+            const totalCost = loanAmount + totalInterest;
+
+            doc.setFontSize(16);
+            doc.text('Amortization Schedule', 148, 20, null, null, 'center');
+            
+            doc.setFontSize(10);
+            const summaryY = 35;
+            doc.text(`Home Price: ${formatCurrency(params.homePrice)}`, 20, summaryY);
+            doc.text(`Down Payment: ${params.downPayment}%`, 20, summaryY + 7);
+            doc.text(`Loan Amount: ${formatCurrency(loanAmount)}`, 20, summaryY + 14);
+            doc.text(`Interest Rate: ${params.interestRate}%`, 120, summaryY);
+            doc.text(`Loan Term: ${params.loanTerm} years`, 120, summaryY + 7);
+            doc.text(`Monthly P&I: ${formatCurrency(monthlyPayment)}`, 120, summaryY + 14);
+            doc.text(`Total Interest: ${formatCurrency(totalInterest)}`, 220, summaryY);
+            doc.text(`Total Cost: ${formatCurrency(totalCost)}`, 220, summaryY + 7);
+
+            const tableData = amortizationData.map(row => [
+                row[0],
+                row[1],
+                formatCurrency(row[2]),
+                formatCurrency(row[3]),
+                formatCurrency(row[4]),
+                formatCurrency(row[5]),
+                formatCurrency(row[6]),
+                formatCurrency(row[7]),
+                formatCurrency(row[8])
+            ]);
+
+            doc.autoTable({
+                head: [['Payment #', 'Date', 'Principal', 'Interest', 'Total Payment', 'Cum. Principal', 'Cum. Interest', 'Total Paid', 'Balance']],
+                body: tableData,
+                startY: summaryY + 25,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [102, 126, 234] },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 20 },
+                    1: { halign: 'center', cellWidth: 25 },
+                    2: { halign: 'right', cellWidth: 25 },
+                    3: { halign: 'right', cellWidth: 25 },
+                    4: { halign: 'right', cellWidth: 30 },
+                    5: { halign: 'right', cellWidth: 30 },
+                    6: { halign: 'right', cellWidth: 30 },
+                    7: { halign: 'right', cellWidth: 25 },
+                    8: { halign: 'right', cellWidth: 30 }
+                }
+            });
+
+            const filename = `Amortization_Schedule_${new Date().toISOString().slice(0, 10)}.pdf`;
+            doc.save(filename);
         }
 
         // Generate the schedule when the page loads
