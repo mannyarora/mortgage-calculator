@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amortization Schedule</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item .label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .summary-item .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th:first-child, td:first-child {
+            text-align: left;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:hover {
+            background-color: #e9ecef;
+        }
+
+        .close-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .close-button:hover {
+            background: #c82333;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .summary {
+                grid-template-columns: 1fr;
+            }
+            
+            th, td {
+                padding: 8px 4px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="close-button" onclick="window.close()">✕ Close</button>
+    
+    <div class="container">
+        <h1>Amortization Schedule</h1>
+        
+        <div class="summary" id="summary">
+            <!-- Summary will be populated by JavaScript -->
+        </div>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Payment #</th>
+                        <th>Payment Date</th>
+                        <th>Principal</th>
+                        <th>Interest</th>
+                        <th>Total Payment</th>
+                        <th>Remaining Balance</th>
+                    </tr>
+                </thead>
+                <tbody id="amortization-table">
+                    <!-- Table rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                homePrice: parseFloat(params.get('homePrice')),
+                downPayment: parseFloat(params.get('downPayment')),
+                interestRate: parseFloat(params.get('interestRate')),
+                loanTerm: parseFloat(params.get('loanTerm')),
+                propertyTax: parseFloat(params.get('propertyTax')),
+                insurance: parseFloat(params.get('insurance'))
+            };
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(amount);
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function generateAmortizationSchedule() {
+            const params = getUrlParams();
+            
+            if (!params.homePrice || params.homePrice <= 0) {
+                document.getElementById('summary').innerHTML = '<p>Invalid loan parameters. Please go back and enter valid values.</p>';
+                return;
+            }
+
+            const loanAmount = params.homePrice - (params.downPayment / 100 * params.homePrice);
+            const monthlyRate = params.interestRate / 100 / 12;
+            const totalPayments = params.loanTerm * 12;
+            
+            let monthlyPayment;
+            if (monthlyRate === 0) {
+                monthlyPayment = loanAmount / totalPayments;
+            } else {
+                monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+                                (Math.pow(1 + monthlyRate, totalPayments) - 1);
+            }
+
+            // Generate summary
+            const totalInterest = (monthlyPayment * totalPayments) - loanAmount;
+            const totalCost = loanAmount + totalInterest;
+            
+            document.getElementById('summary').innerHTML = `
+                <div class="summary-item">
+                    <div class="label">Home Price</div>
+                    <div class="value">${formatCurrency(params.homePrice)}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Loan Amount</div>
+                    <div class="value">${formatCurrency(loanAmount)}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Monthly P&I</div>
+                    <div class="value">${formatCurrency(monthlyPayment)}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Total Interest</div>
+                    <div class="value">${formatCurrency(totalInterest)}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Total Cost</div>
+                    <div class="value">${formatCurrency(totalCost)}</div>
+                </div>
+            `;
+
+            // Generate amortization table
+            let balance = loanAmount;
+            let tableRows = '';
+            const startDate = new Date();
+            
+            for (let i = 1; i <= totalPayments; i++) {
+                const interestPayment = balance * monthlyRate;
+                const principalPayment = monthlyPayment - interestPayment;
+                balance -= principalPayment;
+                
+                // Handle floating point precision issues
+                if (balance < 0.01) balance = 0;
+                
+                const paymentDate = new Date(startDate);
+                paymentDate.setMonth(startDate.getMonth() + i);
+                
+                tableRows += `
+                    <tr>
+                        <td>${i}</td>
+                        <td>${formatDate(paymentDate)}</td>
+                        <td>${formatCurrency(principalPayment)}</td>
+                        <td>${formatCurrency(interestPayment)}</td>
+                        <td>${formatCurrency(monthlyPayment)}</td>
+                        <td>${formatCurrency(balance)}</td>
+                    </tr>
+                `;
+            }
+            
+            document.getElementById('amortization-table').innerHTML = tableRows;
+        }
+
+        // Generate the schedule when the page loads
+        document.addEventListener('DOMContentLoaded', generateAmortizationSchedule);
+    </script>
+</body>
+</html>
