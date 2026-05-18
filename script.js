@@ -76,6 +76,10 @@ function showAmortization() {
     window.open(`amortization.html?${params.toString()}`, '_blank');
 }
 
+function showDepreciation() {
+    window.open('depreciation.html', '_blank');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
