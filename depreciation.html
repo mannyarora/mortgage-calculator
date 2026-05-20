@@ -382,8 +382,8 @@
                 <div class="hint">Optional — added to basis</div>
             </div>
             <div class="input-group">
-                <label for="startYear">Year Placed in Service</label>
-                <input type="number" id="startYear" value="2024" step="1">
+                <label for="purchaseDate">Date of Purchase / Placed in Service</label>
+                <input type="date" id="purchaseDate">
             </div>
         </div>
 
@@ -468,9 +468,17 @@
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: 'USD',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }).format(amount);
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
         }
 
         document.getElementById('propertyType').addEventListener('change', function() {
@@ -484,12 +492,16 @@
                 ? parseFloat(document.getElementById('customYears').value)
                 : parseFloat(propertyTypeVal);
 
+            const purchaseDateStr = document.getElementById('purchaseDate').value;
+            const purchaseDate = purchaseDateStr ? new Date(purchaseDateStr + 'T00:00:00') : new Date();
+
             return {
                 years: years,
                 landValue: parseFloat(document.getElementById('landValue').value) || 0,
                 buildingValue: parseFloat(document.getElementById('buildingValue').value) || 0,
                 improvements: parseFloat(document.getElementById('improvements').value) || 0,
-                startYear: parseInt(document.getElementById('startYear').value) || new Date().getFullYear(),
+                purchaseDate: purchaseDate,
+                startYear: purchaseDate.getFullYear(),
                 saleYear: parseInt(document.getElementById('saleYear').value) || 1,
                 salePrice: parseFloat(document.getElementById('salePrice').value) || 0,
                 sellingCostsPct: parseFloat(document.getElementById('sellingCosts').value) || 0,
@@ -555,7 +567,8 @@
                 annualDep,
                 years: i.years,
                 depreciableBasis,
-                totalDepOverSchedule
+                totalDepOverSchedule,
+                purchaseDate: i.purchaseDate
             });
 
             renderSaleCard({
@@ -594,6 +607,10 @@
 
         function renderSummary(s) {
             document.getElementById('summary').innerHTML = `
+                <div class="summary-item">
+                    <div class="label">Date of Purchase</div>
+                    <div class="value">${formatDate(s.purchaseDate)}</div>
+                </div>
                 <div class="summary-item">
                     <div class="label">Depreciable Basis</div>
                     <div class="value">${formatCurrency(s.depreciableBasis)}</div>
@@ -730,7 +747,13 @@
         }
 
         // Auto-calculate on page load with defaults
-        document.addEventListener('DOMContentLoaded', calculateDepreciation);
+        document.addEventListener('DOMContentLoaded', function() {
+            const purchaseDateInput = document.getElementById('purchaseDate');
+            if (purchaseDateInput && !purchaseDateInput.value) {
+                purchaseDateInput.value = new Date().toISOString().slice(0, 10);
+            }
+            calculateDepreciation();
+        });
     </script>
 </body>
 </html>
