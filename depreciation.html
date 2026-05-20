@@ -368,17 +368,17 @@
             </div>
             <div class="input-group">
                 <label for="landValue">Land Value ($)</label>
-                <input type="number" id="landValue" value="100000" step="1000">
+                <input type="text" inputmode="decimal" id="landValue" value="100000" data-currency>
                 <div class="hint">Not depreciable</div>
             </div>
             <div class="input-group">
                 <label for="buildingValue">Building Value ($)</label>
-                <input type="number" id="buildingValue" value="400000" step="1000">
+                <input type="text" inputmode="decimal" id="buildingValue" value="400000" data-currency>
                 <div class="hint">Depreciable basis</div>
             </div>
             <div class="input-group">
                 <label for="improvements">Capital Improvements ($)</label>
-                <input type="number" id="improvements" value="0" step="1000">
+                <input type="text" inputmode="decimal" id="improvements" value="0" data-currency>
                 <div class="hint">Optional — added to basis</div>
             </div>
             <div class="input-group">
@@ -395,7 +395,7 @@
             </div>
             <div class="input-group">
                 <label for="salePrice">Expected Sale Price ($)</label>
-                <input type="number" id="salePrice" value="700000" step="1000">
+                <input type="text" inputmode="decimal" id="salePrice" value="700000" data-currency>
             </div>
             <div class="input-group">
                 <label for="sellingCosts">Selling Costs (%)</label>
@@ -473,6 +473,39 @@
             }).format(amount);
         }
 
+        function parseFormattedNumber(value) {
+            return parseFloat(String(value).replace(/,/g, '')) || 0;
+        }
+
+        function formatNumberWithCommas(value) {
+            const cleaned = String(value).replace(/[^\d.]/g, '');
+            const firstDot = cleaned.indexOf('.');
+            const intRaw = firstDot === -1 ? cleaned : cleaned.slice(0, firstDot);
+            const decRaw = firstDot === -1 ? '' : cleaned.slice(firstDot + 1).replace(/\./g, '').slice(0, 2);
+            const intFormatted = intRaw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return firstDot === -1 ? intFormatted : `${intFormatted}.${decRaw}`;
+        }
+
+        function attachCommaFormatter(input) {
+            const reformat = () => {
+                const oldValue = input.value;
+                const cursorPos = input.selectionStart ?? oldValue.length;
+                const digitsBefore = oldValue.slice(0, cursorPos).replace(/[^\d.]/g, '').length;
+                const formatted = formatNumberWithCommas(oldValue);
+                if (formatted === oldValue) return;
+                input.value = formatted;
+                let newPos = 0;
+                let count = 0;
+                while (newPos < formatted.length && count < digitsBefore) {
+                    if (/[\d.]/.test(formatted[newPos])) count++;
+                    newPos++;
+                }
+                try { input.setSelectionRange(newPos, newPos); } catch (e) { /* ignore */ }
+            };
+            input.addEventListener('input', reformat);
+            input.value = formatNumberWithCommas(input.value);
+        }
+
         function formatDate(date) {
             return date.toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -497,13 +530,13 @@
 
             return {
                 years: years,
-                landValue: parseFloat(document.getElementById('landValue').value) || 0,
-                buildingValue: parseFloat(document.getElementById('buildingValue').value) || 0,
-                improvements: parseFloat(document.getElementById('improvements').value) || 0,
+                landValue: parseFormattedNumber(document.getElementById('landValue').value),
+                buildingValue: parseFormattedNumber(document.getElementById('buildingValue').value),
+                improvements: parseFormattedNumber(document.getElementById('improvements').value),
                 purchaseDate: purchaseDate,
                 startYear: purchaseDate.getFullYear(),
                 saleYear: parseInt(document.getElementById('saleYear').value) || 1,
-                salePrice: parseFloat(document.getElementById('salePrice').value) || 0,
+                salePrice: parseFormattedNumber(document.getElementById('salePrice').value),
                 sellingCostsPct: parseFloat(document.getElementById('sellingCosts').value) || 0,
                 ordinaryRate: parseFloat(document.getElementById('ordinaryRate').value) || 0,
                 stateRate: parseFloat(document.getElementById('stateRate').value) || 0,
@@ -752,6 +785,7 @@
             if (purchaseDateInput && !purchaseDateInput.value) {
                 purchaseDateInput.value = new Date().toISOString().slice(0, 10);
             }
+            document.querySelectorAll('input[data-currency]').forEach(attachCommaFormatter);
             calculateDepreciation();
         });
     </script>
