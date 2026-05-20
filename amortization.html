@@ -221,7 +221,8 @@
                 interestRate: parseFloat(params.get('interestRate')),
                 loanTerm: parseFloat(params.get('loanTerm')),
                 propertyTax: parseFloat(params.get('propertyTax')),
-                insurance: parseFloat(params.get('insurance'))
+                insurance: parseFloat(params.get('insurance')),
+                startDate: params.get('startDate')
             };
         }
 
@@ -266,7 +267,12 @@
             const totalInterest = (monthlyPayment * totalPayments) - loanAmount;
             const totalCost = loanAmount + totalInterest;
             
+            const summaryStartDate = params.startDate ? new Date(params.startDate + 'T00:00:00') : new Date();
             document.getElementById('summary').innerHTML = `
+                <div class="summary-item">
+                    <div class="label">Mortgage Start Date</div>
+                    <div class="value">${formatDate(summaryStartDate)}</div>
+                </div>
                 <div class="summary-item">
                     <div class="label">Home Price</div>
                     <div class="value">${formatCurrency(params.homePrice)}</div>
@@ -294,7 +300,7 @@
             let cumulativePrincipal = 0;
             let cumulativeInterest = 0;
             let tableRows = '';
-            const startDate = new Date();
+            const startDate = params.startDate ? new Date(params.startDate + 'T00:00:00') : new Date();
             amortizationData = [];
             
             for (let i = 1; i <= totalPayments; i++) {

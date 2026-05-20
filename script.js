@@ -64,13 +64,16 @@ function showAmortization() {
         return;
     }
     
+    const startDate = document.getElementById('startDate').value;
+
     const params = new URLSearchParams({
         homePrice: homePrice,
         downPayment: downPaymentPercent,
         interestRate: annualInterestRate,
         loanTerm: loanTermYears,
         propertyTax: annualPropertyTax,
-        insurance: annualInsurance
+        insurance: annualInsurance,
+        startDate: startDate
     });
     
     window.open(`amortization.html?${params.toString()}`, '_blank');
@@ -81,6 +84,11 @@ function showDepreciation() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('startDate');
+    if (startDateInput && !startDateInput.value) {
+        startDateInput.value = new Date().toISOString().slice(0, 10);
+    }
+
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         input.addEventListener('keypress', function(e) {
